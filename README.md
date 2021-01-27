@@ -1,5 +1,7 @@
 ## Prevent permission to op sync
 
+patch the service.jar to prevent permission to op sync
+
 andorid 29+
 
 ### patcher
@@ -7,13 +9,20 @@ andorid 29+
 patch the service.jar
 
 ### magiskModule
+
 make magisk module
 
-###  patcher source
-```shell
-cd app/source
-adb pull /system/framework/services.jar
-```
+### source
+
+patcher source
+
+## how 
+
+follow the readme from 
+
+* patcher
+* magiskModule
+
 
 > magisk-module template 
 >
