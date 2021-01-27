@@ -1,0 +1,189 @@
+plugins {
+    id 'java'
+    id "com.github.lanchon.dexpatcher.base" version "2.0.0"
+}
+
+
+allprojects {
+    repositories {
+        // DexPatcher repo (https://dexpatcher.github.io/dexpatcher-repo/)
+        maven { url 'https://dexpatcher.github.io/dexpatcher-repo/m2' }
+    }
+    dependencies {
+        configurations.all {
+            switch (name) {
+                case 'apktool':
+                    add name, 'dexpatcher-repo.ibotpeaches.apktool:apktool:2.4.1'
+                    break
+                case 'dex2jar':
+                    add name, 'dexpatcher-repo.dexpatcher.dex2jar:dex-tools:2.1-20171001-lanchon@zip'
+                    break
+                case 'dexpatcher':
+                    add name, 'dexpatcher-repo.dexpatcher.dexpatcher-tool:dexpatcher:1.8.0-beta1'
+                    break
+            }
+        }
+    }
+}
+
+
+import lanchon.dexpatcher.gradle.tasks.Dex2jarTask
+import lanchon.dexpatcher.gradle.tasks.DexpatcherTask
+
+import java.util.zip.ZipException
+import java.util.zip.ZipFile
+
+// Configuration
+
+sourceCompatibility = '1.8'
+
+RegularFile sourceFile = layout.projectDirectory.file(fileTree('source').singleFile.path)
+
+boolean importSourceSymbols = true
+
+Integer importAndroidApiLevel = 29
+boolean importAndroidApiInternals = true
+
+String androidBuildTools = '30.0.3'
+
+boolean multiDex = true
+
+dexpatcherConfig.dex2jar {
+    //translateCode = false
+    //translateDebugInfo = true
+    //optimizeSynchronized = true
+    //reuseRegisters = true
+}
+
+dexpatcherConfig.dexpatcher {
+    //apiLevel = 14
+    //multiDexThreaded = true
+    //multiDexJobs = 8
+    //maxDexPoolSize = 65536
+    //annotationPackage = 'lanchon.dexpatcher.annotation'
+    //constructorAutoIgnore = true
+    verbosity = VERBOSE
+    //logSourcePath = true
+    //logSourcePathRoot = file('src/main/java')
+    //logStats = true
+}
+
+Directory androidSdkDir = null
+
+String sdk = System.getenv('ANDROID_SDK_ROOT');
+
+androidSdkDir = layout.projectDirectory.dir(sdk)
+
+// Setup Tools
+
+dexpatcherConfig.dexpatcher.multiDex = multiDex
+boolean dxMultiDex = multiDex
+
+// Import DexPatcher annotations
+
+def annotationFile = dexpatcherConfig.dexpatcher.bundledAnnotationFile
+project.dependencies.add JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME, project.files(annotationFile)
+
+// Import Android API
+
+if (importAndroidApiLevel) {
+    def platform = androidSdkDir.dir("platforms/android-$importAndroidApiLevel")
+    compileJava.options.bootstrapClasspath = files(checkFile(platform.file('android.jar')))
+    compileJava.options.extensionDirs = ''
+    // Ugly hack to make IntelliJ IDEA see the Android API:
+    // (See: https://youtrack.jetbrains.com/issue/IDEA-180987)
+    dependencies.compileOnly files(compileJava.options.bootstrapClasspath)
+    if (importAndroidApiInternals) {
+        dependencies.compileOnly files(checkFile(platform.file('data/layoutlib.jar')))
+    }
+}
+
+// Import Source Symbols
+
+def dex2jarFile = layout.buildDirectory.get().file('dex2jar/classes.jar')
+def dex2jarExceptionFile = layout.buildDirectory.get().file('dex2jar/dex2jar-error.zip')
+
+task dex2jar(type: Dex2jarTask) {
+    description = "Translates Dalvik bytecode into Java bytecode."
+    dexFiles.from sourceFile
+    outputFile = dex2jarFile
+    exceptionFile = dex2jarExceptionFile
+}
+
+if (importSourceSymbols) {
+    compileJava.dependsOn dex2jar
+    dependencies.compileOnly files(dex2jarFile)
+}
+
+// Create Patch
+
+jar.baseName = 'patch'
+def patchDexDir = layout.buildDirectory.get().dir('patch-dex')
+
+task dx(type: JavaExec) {
+    description = "Translates Java bytecode into Dalvik bytecode."
+    dependsOn jar
+    def dxJar = checkFile(androidSdkDir.file("build-tools/$androidBuildTools/lib/dx.jar"))
+    def patchJar = jar.archivePath
+    inputs.files dxJar, patchJar
+    outputs.dir patchDexDir
+    inputs.property "multiDex", dxMultiDex
+    classpath dxJar
+    main = 'com.android.dx.command.Main'
+    args '--dex'
+    if (dxMultiDex) args '--multi-dex'
+    args '--output', patchDexDir
+    args patchJar
+    doFirst {
+        patchDexDir.asFile.mkdirs()
+    }
+}
+
+assemble.dependsOn dx
+
+// Apply Patch
+
+def patchedDexDir = layout.buildDirectory.get().dir('patched-dex')
+
+task dexpatcher(type: DexpatcherTask) {
+    description = "Patches the source dex using the just-built patch dex."
+    dependsOn dx
+    source = sourceFile
+    patch = patchDexDir
+    outputDir = patchedDexDir
+}
+
+assemble.dependsOn dexpatcher
+
+// Repack Archive
+
+boolean sourceIsZip = false
+if (sourceFile.asFile.isFile()) {
+    try {
+        new ZipFile(sourceFile.asFile).close()
+        sourceIsZip = true
+    } catch (ZipException e) {
+    }
+}
+
+if (sourceIsZip) {
+    task repack(type: Zip) {
+        description = "Repacks the patched dex into a copy of the source archive."
+        dependsOn dexpatcher
+        destinationDir = layout.buildDirectory.get().dir('repack').asFile
+        archiveName sourceFile.asFile.name
+        from(zipTree(sourceFile)) {
+            exclude 'classes*.dex'
+        }
+        from(fileTree(patchedDexDir))
+    }
+
+    assemble.dependsOn repack
+}
+
+// Helpers
+
+static RegularFile checkFile(RegularFile file) {
+    if (!file.asFile.exists()) throw new FileNotFoundException("File not found: $file")
+    return file
+}

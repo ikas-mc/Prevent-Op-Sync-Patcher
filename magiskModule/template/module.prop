@@ -1,0 +1,6 @@
+id=ikas_prevent_appop_sync
+name=Prevent Appop Sync
+version=1.0
+versionCode=1
+author=ikas
+description=Prevent Appop Sync From Permission. more: https://github.com/ikas-mc/Prevent-Op-Sync-Patcher
