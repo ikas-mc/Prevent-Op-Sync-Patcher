@@ -3,6 +3,15 @@ plugins {
     id "com.github.lanchon.dexpatcher.base" version "2.0.0"
 }
 
+def androidVersion = 29
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ["src/main/${androidVersion}/java","src/main/all/java"]
+        }
+    }
+}
 
 allprojects {
     repositories {
@@ -39,9 +48,9 @@ sourceCompatibility = '1.8'
 
 RegularFile sourceFile = layout.projectDirectory.file(fileTree('source').singleFile.path)
 
-boolean importSourceSymbols = true
+boolean importSourceSymbols = false
 
-Integer importAndroidApiLevel = 29
+Integer importAndroidApiLevel = androidVersion
 boolean importAndroidApiInternals = true
 
 String androidBuildTools = '30.0.3'
@@ -86,16 +95,26 @@ project.dependencies.add JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME, project.fil
 
 // Import Android API
 
+//if (importAndroidApiLevel) {
+//    def platform = androidSdkDir.dir("platforms/android-$importAndroidApiLevel")
+//    compileJava.options.bootstrapClasspath = files(checkFile(platform.file('android.jar')))
+//    compileJava.options.extensionDirs = ''
+//    // Ugly hack to make IntelliJ IDEA see the Android API:
+//    // (See: https://youtrack.jetbrains.com/issue/IDEA-180987)
+//    dependencies.compileOnly files(compileJava.options.bootstrapClasspath)
+//    if (importAndroidApiInternals && importAndroidApiLevel<30) {
+//        dependencies.compileOnly files(checkFile(platform.file('data/layoutlib.jar')))
+//    }
+//}
+
 if (importAndroidApiLevel) {
-    def platform = androidSdkDir.dir("platforms/android-$importAndroidApiLevel")
-    compileJava.options.bootstrapClasspath = files(checkFile(platform.file('android.jar')))
+    def androidLib = project.rootProject.file("libs\\android.h.${importAndroidApiLevel}.jar")
+    println androidLib
+    compileJava.options.bootstrapClasspath = files(androidLib)
     compileJava.options.extensionDirs = ''
     // Ugly hack to make IntelliJ IDEA see the Android API:
     // (See: https://youtrack.jetbrains.com/issue/IDEA-180987)
     dependencies.compileOnly files(compileJava.options.bootstrapClasspath)
-    if (importAndroidApiInternals) {
-        dependencies.compileOnly files(checkFile(platform.file('data/layoutlib.jar')))
-    }
 }
 
 // Import Source Symbols
