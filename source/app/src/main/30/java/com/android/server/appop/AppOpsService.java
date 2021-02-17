@@ -50,8 +50,8 @@ public class AppOpsService {
         }
 
         //允许
-        for (int i : ALLOW_OP_LIST) {
-            if (ALLOW_OP_LIST[i] == op) {
+        for (int item : ALLOW_OP_LIST) {
+            if (item == op) {
                 setUidMode(op, uid, mode, permissionPolicyCallback);
                 return;
             }
