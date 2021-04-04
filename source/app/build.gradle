@@ -3,7 +3,7 @@ plugins {
     id "com.github.lanchon.dexpatcher.base" version "2.0.0"
 }
 
-def androidVersion = 29
+def androidVersion = 30
 
 sourceSets {
     main {
