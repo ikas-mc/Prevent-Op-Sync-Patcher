@@ -1,5 +1,12 @@
 ## Prevent permission to op sync
 
+
+- **Do not use it directly, it must be used with my app**
+- **不要直接使用,必须配合app使用**
+- **https://github.com/ikas-mc/px-app**
+
+
+
 patch the service.jar to prevent permission to op sync
 
 andorid 29+
