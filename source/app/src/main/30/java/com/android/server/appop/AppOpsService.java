@@ -72,7 +72,7 @@ public class AppOpsService {
             setUidMode(op, uid, mode, permissionPolicyCallback);
         } else {
             //其他情况不允许
-            Log.w("AppOpsService-hook", String.format("skip setSidMode,uid=%s,op=%s,toSetMode=%s", uid, op, mode));
+            Log.w("AppOpsService-hook", String.format("skip setUidMode,uid=%s,op=%s,toSetMode=%s", uid, op, mode));
         }
 
     }
